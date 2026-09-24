@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "latent-language-lab"
+version = "0.1.0"
+description = "Independent monolingual autoencoders and decoder-swap experiments"
+requires-python = ">=3.10"
+dependencies = ["torch>=2.6,<3", "tokenizers==0.22.2", "sacrebleu==2.5.1"]
+
+[project.scripts]
+latentlab = "latentlab.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["latentlab*"]
