@@ -27,7 +27,9 @@ def render(event):
     es = f'El {NOUNS[a][1]} {COLORS[ac][1]} {es_v} al {NOUNS[p][1]} {COLORS[pc][1]}.'
     return {'en': en, 'es': es, 'event': list(event)}
 
-def make_data(out, train=20000, val=1000, align=1000, test=1000, ood=500, seed=42):
+def make_data(out, train=20000, val=1000, align=0, test=1000, ood=500, seed=42):
+    if min(train, val, test, ood) <= 0 or align < 0:
+        raise ValueError('Split sizes must be positive.')
     out = Path(out)
     if out.exists() and any(out.iterdir()):
         raise ValueError('Output directory is not empty; choose a new data directory.')
@@ -44,6 +46,8 @@ def make_data(out, train=20000, val=1000, align=1000, test=1000, ood=500, seed=4
     out.mkdir(parents=True, exist_ok=True)
     offset = 0
     for split, count in [('train',train),('val',val),('align',align),('test',test),('ood',ood)]:
+        if count == 0:
+            continue
         events = heldout[:count] if split == 'ood' else ordinary[offset:offset+count]
         if split != 'ood':
             offset += count

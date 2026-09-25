@@ -162,47 +162,6 @@ def collect_latents(model, tokenizer, texts, device, batch_size):
                       for i in range(0,len(rows),batch_size)])
 
 
-def fit_map(x,y,kind='orthogonal',ridge=0.01):
-    # One d x d feature map shared across slots; slot correspondence is assumed.
-    x,y = x.double().flatten(0,1),y.double().flatten(0,1)
-    mx,my = x.mean(0),y.mean(0)
-    xc,yc = x-mx,y-my
-    if kind == 'orthogonal':
-        u,_,vh = torch.linalg.svd(xc.T@yc)
-        w = u@vh
-    else:
-        cov = xc.T@xc / len(xc)
-        cross = xc.T@yc / len(xc)
-        w = torch.linalg.solve(cov+ridge*torch.eye(cov.shape[0],dtype=cov.dtype),cross)
-    return {'weight':w.float(),'mean_source':mx.float(),'mean_target':my.float(),'kind':kind}
-
-
-def apply_map(z,bridge):
-    return (z-bridge['mean_source'].to(z))@bridge['weight'].to(z)+bridge['mean_target'].to(z)
-
-
-def align(args):
-    device = device_for(args.device)
-    source,st,sc = load_model(args.source,device)
-    target,tt,tc = load_model(args.target,device)
-    if (source.config.slots,source.config.width)!=(target.config.slots,target.config.width):
-        raise ValueError('This bridge requires matching slot counts and widths.')
-    pairs = read_pairs(args.pairs)
-    if args.n > len(pairs):
-        raise ValueError('--n exceeds available alignment pairs.')
-    pairs = random.Random(args.seed).sample(pairs,args.n)
-    x = collect_latents(source,st,[r[sc['lang']] for r in pairs],device,args.batch_size)
-    y = collect_latents(target,tt,[r[tc['lang']] for r in pairs],device,args.batch_size)
-    if args.shuffle_pairs:
-        y = y[torch.randperm(len(y),generator=torch.Generator().manual_seed(args.seed))]
-    bridge = fit_map(x,y,args.kind,args.ridge)
-    bridge.update({'source_sha256':digest(args.source),'target_sha256':digest(args.target),
-                   'pairs_sha256':digest(args.pairs),'n':args.n,'seed':args.seed,
-                   'shuffled_pairs':args.shuffle_pairs,'slots':source.config.slots})
-    atomic_save(bridge,args.out)
-    print(json.dumps({'saved':args.out,'n':args.n,'kind':args.kind,'shuffled':args.shuffle_pairs}))
-
-
 def evaluate(args):
     from sacrebleu.metrics import CHRF
     device = device_for(args.device)
@@ -218,11 +177,6 @@ def evaluate(args):
     src_text = [r[sc['lang']] for r in pairs]
     references = [r[tc['lang']] for r in pairs]
     z = collect_latents(source,st,src_text,device,args.batch_size)
-    if args.bridge:
-        bridge = torch.load(args.bridge,map_location='cpu',weights_only=True)
-        if bridge['source_sha256']!=digest(args.source) or bridge['target_sha256']!=digest(args.target):
-            raise ValueError('Bridge was fitted for different checkpoints.')
-        z = apply_map(z,bridge)
     if args.shuffle_latents:
         # A cyclic shift changes every source association, even for small tests.
         z = z.roll(1,0)
@@ -235,7 +189,7 @@ def evaluate(args):
     score = metric.corpus_score(outputs,[references])
     result = {'n':len(pairs),'chrf':score.score,'chrf_signature':str(metric.get_signature()),
               'exact_match':sum(a.strip()==b.strip() for a,b in zip(outputs,references))/len(pairs),
-              'source':args.source,'target':args.target,'bridge':args.bridge,
+              'source':args.source,'target':args.target,'mode':'direct',
               'shuffle_latents':args.shuffle_latents,'pairs_sha256':digest(args.pairs)}
     out = Path(args.out)
     out.parent.mkdir(parents=True,exist_ok=True)

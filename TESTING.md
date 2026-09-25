@@ -1,17 +1,14 @@
-# Validation performed
+# Validation
 
-Validated with Python 3.12, PyTorch 2.6.0+cpu, tokenizers 0.22.2 and sacrebleu 2.5.1.
+Four CPU tests passed with Python 3.12, PyTorch 2.6.0+cpu, tokenizers 0.23.1 and sacrebleu 2.5.1.
 
-- Editable package installation succeeded.
-- Three unittest tests passed, covering held-out data separation; recovery of a known orthogonal/linear coordinate transformation; and the end-to-end train → save → resume → swap → align → evaluate → component-export workflow.
-- Python source and notebook code cells parsed successfully.
-- The default 20,000-example data preparation and tokenizer paths ran for both languages. Longest training examples were 12 English tokens and 11 Spanish tokens including BOS/EOS, within the 64-token default.
-- Default parameter counts: English 7,746,048; Spanish 7,747,840.
+Tests cover:
 
-The tests used tiny CPU models and do not establish convergence or cross-language semantic transfer. A full training run and CUDA/BF16 execution were not performed here. Google Drive mounting and Colab's interface must be exercised in the user's own session.
+- Separation of generated training and evaluation data.
+- Training, checkpoint resumption, reconstruction, direct swaps and component export.
+- Named training and resumption with saved settings, plus rejection of a language mismatch.
+- Merged encoder and decoder computations matching the original selected components. A saved merged model still generates the same output after the original training folders are removed.
 
-Run tests from the repository root with:
+Python source compilation and CLI help checks passed. These checks validate software behavior with tiny models; they do not demonstrate translation quality. No full GPU training run was performed.
 
-```bash
-python -m unittest discover -s tests -v
-```
+Run tests with `python -m unittest discover -s tests -v`.
